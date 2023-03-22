@@ -5,7 +5,7 @@ const apiAuth = `Basic ${Buffer.from(`${process.env.LOGIN_STRING}`).toString(
 )}`
 
 const api = axios.create({
-    baseUrl: "https://emporio-leads.atlassian.net/rest/api/3",
+    baseUrl: "https://emporio-leads.atlassian.net/rest/api/2",
     headers: {
         Authorization: `Basic ${process.env.B64_TOKEN}`,
     },
