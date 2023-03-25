@@ -11,8 +11,8 @@ exports.getTasks = async (req, res) => {
     return res.status(response.status).json(response.data)
 }
 
-exports.getUser = async (req, res) => {
-    const response = await api.get(`${baseUrl}/users`)
+exports.getAllUsers = async (req, res) => {
+    const response = await api.get(`${baseUrl}/users/search`)
 
     const users = response.data.map((user) => {
         if (user.active) {
