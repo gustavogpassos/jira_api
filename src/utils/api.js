@@ -1,13 +1,14 @@
 const axios = require("axios")
 
-const apiAuth = `Basic ${Buffer.from(`${process.env.LOGIN_STRING}`).toString(
-    "base64"
-)}`
+const apiAuth = `Basic ${Buffer.from(
+    `${process.env.API_USER}:${process.env.API_TOKEN}`,
+    "utf-8"
+).toString("base64")}`
 
 const api = axios.create({
-    baseUrl: "https://emporio-leads.atlassian.net/rest/api/2",
+    baseUrl: process.env.BASE_URL,
     headers: {
-        Authorization: `Basic ${process.env.B64_TOKEN}`,
+        Authorization: apiAuth,
     },
 })
 
