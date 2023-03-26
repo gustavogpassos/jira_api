@@ -66,6 +66,9 @@ exports.getUserTasks = async (req, res) => {
 exports.getRunningTasks = async (req, res) => {
     let { dateIni, dateEnd } = req.body
 
+    dateIni = Date.parse(dateIni)
+    dateEnd = Date.parse(dateEnd)
+
     const usersReponse = await api.get(`${baseUrl}/users/search`)
 
     const userStructure = await Promise.all(
@@ -75,64 +78,93 @@ exports.getRunningTasks = async (req, res) => {
                     user
 
                 const responseTasks = await api.get(
-                    `${baseUrl}/search?accountId=${accountId}`
+                    `${baseUrl}/search?jql=assignee=${accountId}`
                 )
+
                 let tasks = {
                     running: [],
                     done: [],
                 }
-                await Promise.all(
-                    responseTasks.data.issues.map(async (issue) => {
-                        const responseComments = await api.get(
-                            `${baseUrl}/issue/${issue.key}/comment`
-                        )
 
-                        let comments = responseComments.data.comments.map(
-                            (comment) => {
-                                const dateParse = Date.parse(comment.created)
-                                console.log(dateParse)
-                                dateIni = Date.parse(dateIni)
-                                dateEnd = Date.parse(dateEnd)
-                                if (
-                                    dateParse >= dateIni &&
-                                    dateParse <= dateEnd
-                                ) {
-                                    return {
-                                        description: comment.body,
-                                        createdAt: comment.created,
-                                        author: comment.author.displayName,
-                                    }
-                                }
-                            }
+                let doneTasks = await Promise.all(
+                    responseTasks.data.issues.map(async (issue) => {
+                        let statusDate = Date.parse(
+                            issue.fields.statuscategorychangedate
                         )
-                        comments = comments.filter((comment) => comment != null)
-                        if (["10001"].indexOf(issue.fields.status.id) + 1) {
+                        if (
+                            ["10014"].indexOf(issue.fields.status.id) + 1 &&
+                            dateIni <= statusDate &&
+                            statusDate <= dateEnd
+                        ) {
                             const { project, status, summary } = issue.fields
                             const newIssue = {
                                 key: issue.key,
+                                statusDate:
+                                    issue.fields.statuscategorychangedate,
                                 project: project.name,
                                 status: status.name,
+                                statusId: status.id,
                                 title: summary,
-                                comments: comments,
+                                comments: [],
                             }
-                            //console.log(newIssue)
-                            tasks.running.push(newIssue)
-                        }
-                        if (["10002"].indexOf(issue.fields.status.id) + 1) {
-                            const { project, status, summary } = issue.fields
-                            const newIssue = {
-                                key: issue.key,
-                                project: project.name,
-                                status: status.name,
-                                title: summary,
-                                comments: comments,
-                            }
-                            console.log(newIssue)
-                            tasks.done.push(newIssue)
+                            await api
+                                .get(`${baseUrl}/issue/${issue.key}/comment`)
+                                .then((comments) => {
+                                    const issueComments =
+                                        comments.data.comments.map(
+                                            (comment) => {
+                                                return {
+                                                    description: comment.body,
+                                                    createdAt: comment.created,
+                                                    author: comment.author
+                                                        .displayName,
+                                                }
+                                            }
+                                        )
+
+                                    newIssue.comments = issueComments
+                                })
+                            return newIssue
                         }
                     })
                 )
-                //console.log(tasks)
+                doneTasks = doneTasks.filter((task) => task != null)
+                tasks.done = doneTasks
+
+                let runningTasks = await Promise.all(
+                    responseTasks.data.issues.map(async (issue) => {
+                        if (["3"].indexOf(issue.fields.status.id) + 1) {
+                            const { project, status, summary } = issue.fields
+                            const newIssue = {
+                                key: issue.key,
+                                project: project.name,
+                                status: status.name,
+                                statusId: status.id,
+                                title: summary,
+                                comments: [],
+                            }
+                            await api
+                                .get(`${baseUrl}/issue/${issue.key}/comment`)
+                                .then((comments) => {
+                                    const issueComments =
+                                        comments.data.comments.map(
+                                            (comment) => {
+                                                return {
+                                                    description: comment.body,
+                                                    createdAt: comment.created,
+                                                    author: comment.author
+                                                        .displayName,
+                                                }
+                                            }
+                                        )
+                                    newIssue.comments = issueComments
+                                })
+                            return newIssue
+                        }
+                    })
+                )
+                runningTasks = runningTasks.filter((task) => task != null)
+                tasks.running = runningTasks
 
                 const newUser = {
                     accountId,
@@ -141,7 +173,6 @@ exports.getRunningTasks = async (req, res) => {
                     emailAddress,
                     tasks: tasks,
                 }
-                console.log(newUser)
                 return newUser
             }
         })
