@@ -18,4 +18,8 @@ jiraRouter.get("/users", async (req, res) => {
     return await controller.getAllUsers(req, res)
 })
 
+jiraRouter.get("/project/tasks", async (req, res) => {
+    return await controller.getRunningTasks(req, res)
+})
+
 module.exports = jiraRouter

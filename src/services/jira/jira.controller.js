@@ -62,3 +62,90 @@ exports.getUserTasks = async (req, res) => {
     )
     return res.status(response.status).json(issues)
 }
+
+exports.getRunningTasks = async (req, res) => {
+    let { dateIni, dateEnd } = req.body
+
+    const usersReponse = await api.get(`${baseUrl}/users/search`)
+
+    const userStructure = await Promise.all(
+        usersReponse.data.map(async (user) => {
+            if (user.accountType == "atlassian") {
+                const { accountId, accountType, emailAddress, displayName } =
+                    user
+
+                const responseTasks = await api.get(
+                    `${baseUrl}/search?accountId=${accountId}`
+                )
+                let tasks = {
+                    running: [],
+                    done: [],
+                }
+                await Promise.all(
+                    responseTasks.data.issues.map(async (issue) => {
+                        const responseComments = await api.get(
+                            `${baseUrl}/issue/${issue.key}/comment`
+                        )
+
+                        let comments = responseComments.data.comments.map(
+                            (comment) => {
+                                const dateParse = Date.parse(comment.created)
+                                console.log(dateParse)
+                                dateIni = Date.parse(dateIni)
+                                dateEnd = Date.parse(dateEnd)
+                                if (
+                                    dateParse >= dateIni &&
+                                    dateParse <= dateEnd
+                                ) {
+                                    return {
+                                        description: comment.body,
+                                        createdAt: comment.created,
+                                        author: comment.author.displayName,
+                                    }
+                                }
+                            }
+                        )
+                        comments = comments.filter((comment) => comment != null)
+                        if (["10001"].indexOf(issue.fields.status.id) + 1) {
+                            const { project, status, summary } = issue.fields
+                            const newIssue = {
+                                key: issue.key,
+                                project: project.name,
+                                status: status.name,
+                                title: summary,
+                                comments: comments,
+                            }
+                            //console.log(newIssue)
+                            tasks.running.push(newIssue)
+                        }
+                        if (["10002"].indexOf(issue.fields.status.id) + 1) {
+                            const { project, status, summary } = issue.fields
+                            const newIssue = {
+                                key: issue.key,
+                                project: project.name,
+                                status: status.name,
+                                title: summary,
+                                comments: comments,
+                            }
+                            console.log(newIssue)
+                            tasks.done.push(newIssue)
+                        }
+                    })
+                )
+                //console.log(tasks)
+
+                const newUser = {
+                    accountId,
+                    displayName,
+                    accountType,
+                    emailAddress,
+                    tasks: tasks,
+                }
+                console.log(newUser)
+                return newUser
+            }
+        })
+    )
+    const usersList = userStructure.filter((user) => user != null)
+    return res.status(200).json(usersList)
+}
